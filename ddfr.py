@@ -80,7 +80,6 @@ def get_data(options, bbox):
                         str(options['start'].date()) + "T12:00:00Z&time_end=" + str(options['end'].date()) + \
                       "T12:00:00Z&timeStride=1&accept=netcdf"
                 req = urllib.request.Request(url)
-                # print(url)
                 response = urllib.request.urlopen(req, timeout=timeout)
                 totalsize = int(response.info()['Content-Length'])
                 currentsize = 0
@@ -110,14 +109,13 @@ def get_data(options, bbox):
                 else:
                     pass
             if options['merge']:
-                print('Merging files...')
                 merge_netcdf(options['output_folder'], variable)
-                print('Merge complete.')
         print("Download complete!")
 
 
 def merge_netcdf(file_path, variable):
     try:
+        print('Merging files...')
         ds = xr.open_mfdataset(file_path + '/*' + variable + '.nc', parallel=False)
         # Round down the time values to the nearest integer (remove the 0.5)
         ds['time'] = ds['time'].dt.floor('D')
@@ -132,6 +130,7 @@ def merge_netcdf(file_path, variable):
         ds_modified.to_netcdf(file_path + '/' + variable + '_merged.nc')
         ds.close()
         ds_modified.close()
+        print('Merge complete.')
     except Exception as e:
         print('The merging attempt failed. Manual processing will be required.')
         print(e)
@@ -141,13 +140,13 @@ def merge_netcdf(file_path, variable):
 def check_missing_dates(ncfile):
     ds = xr.open_dataset(ncfile)
     time_data = ds['time'].values
-    start_year = int(pd.Timestamp(time_data.min()).strftime('%Y'))
-    end_year = int(pd.Timestamp(time_data.max()).strftime('%Y'))
+    start_date = pd.Timestamp(time_data.min())
+    end_date = pd.Timestamp(time_data.max())
     datetime_list = [datetime.fromtimestamp(ts.astype('O') / 1e9, timezone.utc).replace(tzinfo=None)
                      for ts in time_data]
 
-    start_date = datetime(start_year, 1, 1, 12, 0)
-    end_date = datetime(end_year, 12, 31, 12, 0)
+    start_date = datetime(start_date.year, start_date.month, start_date.day, 12, 0)
+    end_date = datetime(end_date.year, end_date.month, end_date.day, 12, 0)
 
     all_dates = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
 
@@ -266,7 +265,7 @@ options_dict = {
             'polygon_shp': args.input,
             'start': datetime.strptime(args.start, "%Y-%m-%d"),
             'end': datetime.strptime(args.end, "%Y-%m-%d"),
-            'variables': args.variables.split(),
+            'variables': args.variables.split(','),
             'nan_fix': args.nan_fix,
             'merge': args.merge,
             'output_folder': args.output,
