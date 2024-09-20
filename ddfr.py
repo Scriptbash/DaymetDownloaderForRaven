@@ -33,24 +33,6 @@ parser.add_argument("-t", "--timeout", type=int,
 args = parser.parse_args()
 
 
-# def get_search_criteria(options):
-#     output_folder = options['polygon_shp']
-#     start_date = dlg.date_daymet_start_date.date().toPyDate()
-#     end_date = dlg.date_daymet_end_date.date().toPyDate()
-#     selected_variables = dlg.list_daymet_variables.selectedItems()
-#     variables = ""
-#     if selected_variables:
-#         for item in selected_variables:
-#             variables += item.text() + ' '
-#     if start_date and end_date and variables:
-#         dlg.lbl_daymet_error.clear()
-#         bbox = self.define_area(dlg)
-#         self.get_data(bbox, start_date, end_date, variables, output_folder, dlg)
-#     else:
-#         print("At least one variable must be selected.")
-#         sys.exit()
-
-
 def define_area(options):
     input_polygon = options['polygon_shp']
     gdf = gpd.read_file(input_polygon)
@@ -95,9 +77,10 @@ def get_data(options, bbox):
                         + variable + '_' + str(year) + ".nc?var=lat&var=lon&var=" + variable + '&north=' + north + \
                         "&west=" + west + "&east=" + east + "&south=" + south + \
                         "&disableProjSubset=on&horizStride=1&time_start=" + \
-                        str(options['start'].date()) + "T12:00:00Z&time_end=" + str(options['end'].date()) + "T12:00:00Z&timeStride=1&accept=netcdf"
+                        str(options['start'].date()) + "T12:00:00Z&time_end=" + str(options['end'].date()) + \
+                      "T12:00:00Z&timeStride=1&accept=netcdf"
                 req = urllib.request.Request(url)
-                #print(url)
+                # print(url)
                 response = urllib.request.urlopen(req, timeout=timeout)
                 totalsize = int(response.info()['Content-Length'])
                 currentsize = 0
@@ -106,8 +89,8 @@ def get_data(options, bbox):
 
                 filename = str(year) + variable + '.nc'
                 output_file = options['output_folder'] + "/" + filename
-                print("Variable " + str(options['variables'].index(variable) + 1) + "/" + str(len(options['variables'])) +
-                                                " - Downloading " + filename)
+                print("Variable " + str(options['variables'].index(variable) + 1) + "/" +
+                      str(len(options['variables'])) + " - Downloading " + filename)
                 with open(output_file, 'wb') as file:
                     while 1:
                         data = response.read(chunk)
@@ -146,7 +129,6 @@ def merge_netcdf(file_path, variable):
             'lon': lon_without_time,
             variable: ds[variable]
         })
-        #ds_modified['time'] = ds_modified['time'].astype(int)
         ds_modified.to_netcdf(file_path + '/' + variable + '_merged.nc')
         ds.close()
         ds_modified.close()
@@ -161,7 +143,8 @@ def check_missing_dates(ncfile):
     time_data = ds['time'].values
     start_year = int(pd.Timestamp(time_data.min()).strftime('%Y'))
     end_year = int(pd.Timestamp(time_data.max()).strftime('%Y'))
-    datetime_list = [datetime.fromtimestamp(ts.astype('O') / 1e9, timezone.utc).replace(tzinfo=None) for ts in time_data]
+    datetime_list = [datetime.fromtimestamp(ts.astype('O') / 1e9, timezone.utc).replace(tzinfo=None)
+                     for ts in time_data]
 
     start_date = datetime(start_year, 1, 1, 12, 0)
     end_date = datetime(end_year, 12, 31, 12, 0)
@@ -226,9 +209,8 @@ def fix_missing_values(ncfile, missing_dates, variable):
                     before_date = (pd.to_datetime(date) - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
                     after_date = (pd.to_datetime(date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
 
-                    if before_date in [str(ts)[:10] for ts in updated_data.time.values] and after_date in [str(ts)[:10]
-                                                                                                           for ts in
-                                                                                                           updated_data.time.values]:
+                    if before_date in [str(ts)[:10] for ts in updated_data.time.values] and \
+                            after_date in [str(ts)[:10] for ts in updated_data.time.values]:
                         before_values = updated_data[variable].sel(time=before_date, method='nearest').values
                         after_values = updated_data[variable].sel(time=after_date, method='nearest').values
                         if not np.any(np.isnan(before_values)) and not np.any(np.isnan(after_values)):
@@ -241,9 +223,8 @@ def fix_missing_values(ncfile, missing_dates, variable):
 
                     before_date = (pd.to_datetime(date) - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
                     after_date = (pd.to_datetime(date) - pd.Timedelta(days=2)).strftime('%Y-%m-%d')
-                    if before_date in [str(ts)[:10] for ts in updated_data.time.values] and after_date in [str(ts)[:10]
-                                                                                                           for ts in
-                                                                                                           updated_data.time.values]:
+                    if before_date in [str(ts)[:10] for ts in updated_data.time.values] and \
+                            after_date in [str(ts)[:10] for ts in updated_data.time.values]:
                         before_values = updated_data[variable].sel(time=before_date, method='nearest').values
                         after_values = updated_data[variable].sel(time=after_date, method='nearest').values
                         if not np.any(np.isnan(before_values)) and not np.any(np.isnan(after_values)):
@@ -256,9 +237,8 @@ def fix_missing_values(ncfile, missing_dates, variable):
 
                     before_date = (pd.to_datetime(date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
                     after_date = (pd.to_datetime(date) + pd.Timedelta(days=2)).strftime('%Y-%m-%d')
-                    if before_date in [str(ts)[:10] for ts in updated_data.time.values] and after_date in [str(ts)[:10]
-                                                                                                           for ts in
-                                                                                                           updated_data.time.values]:
+                    if before_date in [str(ts)[:10] for ts in updated_data.time.values] and \
+                            after_date in [str(ts)[:10] for ts in updated_data.time.values]:
                         before_values = updated_data[variable].sel(time=before_date, method='nearest').values
                         after_values = updated_data[variable].sel(time=after_date, method='nearest').values
                         if not np.any(np.isnan(before_values)) and not np.any(np.isnan(after_values)):
@@ -293,5 +273,5 @@ options_dict = {
             'timeout': args.timeout,
            }
 
-bbox = define_area(options_dict)
-get_data(options_dict, bbox)
+bounding_box = define_area(options_dict)
+get_data(options_dict, bounding_box)
