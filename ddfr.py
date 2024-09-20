@@ -14,21 +14,24 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module='xarray')
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input", type=str,
-                    help="The watershed shapefile path")
+                    help="Path to the watershed shapefile (required for spatial extraction of Daymet data).")
 parser.add_argument("-s", "--start", type=str,
-                    help="Start date")
+                    help="Start date for the data download (format: YYYY-MM-DD).")
 parser.add_argument("-e", "--end", type=str,
-                    help="End date")
+                    help="End date for the data download (format: YYYY-MM-DD).")
 parser.add_argument("-v", "--variables", type=str,
-                    help="Variables to download")
+                    help="Comma-separated list of climate variables to download (e.g., 'tmax,tmin,prcp').")
 parser.add_argument("-n", "--nan_fix",
-                    help="Fix NaN values by averaging neighbours or prior days", action="store_true")
+                    help="Enable this flag to fix NaN values in the dataset "
+                         "by averaging neighboring cells or using prior day's data.", action="store_true")
 parser.add_argument("-m", "--merge",
-                    help="Merge downloaded files into a single NetCDF file", action="store_true")
+                    help="Merge all downloaded NetCDF files into a single output file "
+                         "(per variable).", action="store_true")
 parser.add_argument("-o", "--output", type=str,
-                    help="Path where to save the results")
+                    help="Path to save the processed data (output directory)")
 parser.add_argument("-t", "--timeout", type=int,
-                    help="Timeout delay for the network requests", default=120)
+                    help="Maximum time (in seconds) to wait for network "
+                         "requests before timing out. Default is 120 seconds.", default=120)
 
 args = parser.parse_args()
 
