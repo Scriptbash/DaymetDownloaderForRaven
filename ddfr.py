@@ -1,6 +1,6 @@
 import os
-#import sys
 import warnings
+import argparse
 import urllib.request
 import numpy as np
 import xarray as xr
@@ -10,17 +10,28 @@ from datetime import datetime, timedelta, timezone
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='xarray')
 
+# MacOS users may need to follow these steps https://stackoverflow.com/a/62374703
 
-options = { 
-            'polygon_shp':r'/home/francis/Downloads/canada_new_watershed(1)/haultain/watershed.shp',
-            'start': datetime.strptime('2000-01-01', "%Y-%m-%d"),
-            'end': datetime.strptime('2020-12-31', "%Y-%m-%d"),
-            'variables':['tmin', 'tmax', 'prcp'],
-            'nan_fix': True,
-            'merge': True,
-            'output_folder': r'./output_haultain',
-            'timeout':1800,
-           }
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--input", type=str,
+                    help="The watershed shapefile path")
+parser.add_argument("-s", "--start", type=str,
+                    help="Start date")
+parser.add_argument("-e", "--end", type=str,
+                    help="End date")
+parser.add_argument("-v", "--variables", type=str,
+                    help="Variables to download")
+parser.add_argument("-n", "--nan_fix",
+                    help="Fix NaN values by averaging neighbours or prior days", action="store_true")
+parser.add_argument("-m", "--merge",
+                    help="Merge downloaded files into a single NetCDF file", action="store_true")
+parser.add_argument("-o", "--output", type=str,
+                    help="Path where to save the results")
+parser.add_argument("-t", "--timeout", type=int,
+                    help="Timeout delay for the network requests", default=120)
+
+args = parser.parse_args()
+
 
 # def get_search_criteria(options):
 #     output_folder = options['polygon_shp']
@@ -39,6 +50,7 @@ options = {
 #         print("At least one variable must be selected.")
 #         sys.exit()
 
+
 def define_area(options):
     input_polygon = options['polygon_shp']
     gdf = gpd.read_file(input_polygon)
@@ -54,12 +66,13 @@ def define_area(options):
 
     for i, row in gdf.iterrows():
         bbox = row.geometry.bounds  # Returns (xmin, ymin, xmax, ymax)
-        bbox = [str(round(bbox[0], 2)), str(round(bbox[1], 2)), 
+        bbox = [str(round(bbox[0], 2)), str(round(bbox[1], 2)),
                 str(round(bbox[2], 2)), str(round(bbox[3], 2))]
         bbox_list.append(bbox)
 
     print('Bounding box extraction done.')
     return bbox_list
+
 
 def get_data(options, bbox):
     timeout = options['timeout']
@@ -118,7 +131,7 @@ def get_data(options, bbox):
                 merge_netcdf(options['output_folder'], variable)
                 print('Merge complete.')
         print("Download complete!")
-    
+
 
 def merge_netcdf(file_path, variable):
     try:
@@ -141,7 +154,7 @@ def merge_netcdf(file_path, variable):
         print('The merging attempt failed. Manual processing will be required.')
         print(e)
         return
-    
+
 
 def check_missing_dates(ncfile):
     ds = xr.open_dataset(ncfile)
@@ -149,7 +162,6 @@ def check_missing_dates(ncfile):
     start_year = int(pd.Timestamp(time_data.min()).strftime('%Y'))
     end_year = int(pd.Timestamp(time_data.max()).strftime('%Y'))
     datetime_list = [datetime.fromtimestamp(ts.astype('O') / 1e9, timezone.utc).replace(tzinfo=None) for ts in time_data]
-    
 
     start_date = datetime(start_year, 1, 1, 12, 0)
     end_date = datetime(end_year, 12, 31, 12, 0)
@@ -172,7 +184,7 @@ def fix_missing_values(ncfile, missing_dates, variable):
             # Concatenate the missing data with the ds along the 'time' dimension
             updated_data = xr.concat([ds, missing_data], dim='time')
             updated_data = updated_data.fillna(float(0.0))
-            #updated_data.to_netcdf(ncfile)
+            # updated_data.to_netcdf(ncfile)
         else:
             updated_data = ds.fillna(float(0.0))
             # updated_data.to_netcdf('./result/test.nc')
@@ -201,7 +213,7 @@ def fix_missing_values(ncfile, missing_dates, variable):
             except Exception as e:
                 print('Unable to fix the NaN values.')
                 print(e)
-     
+
         if missing_dates:
             missing_data = xr.full_like(ds.isel(time=0), fill_value=np.nan, dtype=float)
             missing_data['time'] = missing_dates
@@ -270,5 +282,16 @@ def fix_missing_values(ncfile, missing_dates, variable):
     ds.close()
 
 
-bbox = define_area(options)
-get_data(options, bbox)
+options_dict = {
+            'polygon_shp': args.input,
+            'start': datetime.strptime(args.start, "%Y-%m-%d"),
+            'end': datetime.strptime(args.end, "%Y-%m-%d"),
+            'variables': args.variables.split(),
+            'nan_fix': args.nan_fix,
+            'merge': args.merge,
+            'output_folder': args.output,
+            'timeout': args.timeout,
+           }
+
+bbox = define_area(options_dict)
+get_data(options_dict, bbox)
