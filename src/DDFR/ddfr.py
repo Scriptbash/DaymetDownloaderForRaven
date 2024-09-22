@@ -12,28 +12,48 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module='xarray')
 
 # MacOS users may need to follow these steps https://stackoverflow.com/a/62374703
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-i", "--input", type=str,
-                    help="Path to the watershed shapefile (required for spatial extraction of Daymet data).")
-parser.add_argument("-s", "--start", type=str,
-                    help="Start date for the data download (format: YYYY-MM-DD).")
-parser.add_argument("-e", "--end", type=str,
-                    help="End date for the data download (format: YYYY-MM-DD).")
-parser.add_argument("-v", "--variables", type=str,
-                    help="Comma-separated list of climate variables to download (e.g., 'tmax,tmin,prcp').")
-parser.add_argument("-n", "--nan_fix",
-                    help="Enable this flag to fix NaN values in the dataset "
-                         "by averaging neighboring cells or using prior day's data.", action="store_true")
-parser.add_argument("-m", "--merge",
-                    help="Merge all downloaded NetCDF files into a single output file "
-                         "(per variable).", action="store_true")
-parser.add_argument("-o", "--output", type=str,
-                    help="Path to save the processed data (output directory)")
-parser.add_argument("-t", "--timeout", type=int,
-                    help="Maximum time (in seconds) to wait for network "
-                         "requests before timing out. Default is 120 seconds.", default=120)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input", type=str,
+                        help="Path to the watershed shapefile (required for spatial extraction of Daymet data).")
+    parser.add_argument("-s", "--start", type=str,
+                        help="Start date for the data download (format: YYYY-MM-DD).")
+    parser.add_argument("-e", "--end", type=str,
+                        help="End date for the data download (format: YYYY-MM-DD).")
+    parser.add_argument("-v", "--variables", type=str,
+                        help="Comma-separated list of climate variables to download (e.g., 'tmax,tmin,prcp').")
+    parser.add_argument("-f", "--fix_nan",
+                        help="Enable this flag to fix NaN values in the dataset "
+                             "by averaging neighboring cells or using prior day's data.", action="store_true")
+    parser.add_argument("-m", "--merge",
+                        help="Merge all downloaded NetCDF files into a single output file "
+                             "(per variable).", action="store_true")
+    parser.add_argument("-o", "--output", type=str,
+                        help="Path to save the processed data (output directory)")
+    parser.add_argument("-t", "--timeout", type=int,
+                        help="Maximum time (in seconds) to wait for network "
+                             "requests before timing out. Default is 120 seconds.", default=120)
 
-args = parser.parse_args()
+    args = parser.parse_args()
+    check_input(args)
+
+
+def check_input(args):
+    options_dict = {
+        'polygon_shp': args.input,
+        'start': datetime.strptime(args.start, "%Y-%m-%d"),
+        'end': datetime.strptime(args.end, "%Y-%m-%d"),
+        'variables': args.variables.split(','),
+        'nan_fix': args.fix_nan,
+        'merge': args.merge,
+        'output_folder': args.output,
+        'timeout': args.timeout,
+    }
+
+    # Must add input checks here
+
+    bounding_box = define_area(options_dict)
+    get_data(options_dict, bounding_box)
 
 
 def define_area(options):
@@ -264,16 +284,6 @@ def fix_missing_values(ncfile, missing_dates, variable):
     ds.close()
 
 
-options_dict = {
-            'polygon_shp': args.input,
-            'start': datetime.strptime(args.start, "%Y-%m-%d"),
-            'end': datetime.strptime(args.end, "%Y-%m-%d"),
-            'variables': args.variables.split(','),
-            'nan_fix': args.nan_fix,
-            'merge': args.merge,
-            'output_folder': args.output,
-            'timeout': args.timeout,
-           }
+if __name__ == "__main__":
+    main()
 
-bounding_box = define_area(options_dict)
-get_data(options_dict, bounding_box)
