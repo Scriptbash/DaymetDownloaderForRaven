@@ -1,4 +1,5 @@
 import os
+import sys
 import warnings
 import argparse
 import urllib.request
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='xarray')
 
 # MacOS users may need to follow these steps https://stackoverflow.com/a/62374703
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -39,6 +41,41 @@ def main():
 
 
 def check_input(args):
+    variable_options = ['tmin', 'tmax', 'prcp']
+
+    # Check for the watershed shapefile
+    if not os.path.exists(args.input):
+        print("Error: Watershed shapefile not found at the provided path.")
+        sys.exit(1)
+
+    # Check the start and end date
+    try:
+        datetime.strptime(args.start, "%Y-%m-%d")
+        datetime.strptime(args.end, "%Y-%m-%d")
+    except ValueError:
+        print('Error: Incorrect date format. Expected format is: YYYY-MM-DD.')
+        sys.exit(1)
+
+    # Check for valid variables
+    for variable in args.variables.split(','):
+        if variable not in variable_options:
+            print('Error: The variable entered is incorrect. The available choices are :\ntmin (minimum temperature)\n'
+                  'tmax (maximum temperature)\nprcp (precipitation)')
+            sys.exit(1)
+
+    # Check for valid output folder and if it's writable
+    if not os.path.exists(args.output):
+        if not os.access(args.output, os.W_OK):
+            print('Error: The output path provided is not writable.')
+            sys.exit(1)
+        else:
+            os.makedirs(args.output)
+            print('Output folder did not exist. One was created.')
+    else:
+        if not os.access(args.output, os.W_OK):
+            print('Error: The output path provided is not writable.')
+            sys.exit(1)
+
     options_dict = {
         'polygon_shp': args.input,
         'start': datetime.strptime(args.start, "%Y-%m-%d"),
@@ -49,8 +86,6 @@ def check_input(args):
         'output_folder': args.output,
         'timeout': args.timeout,
     }
-
-    # Must add input checks here
 
     bounding_box = define_area(options_dict)
     get_data(options_dict, bounding_box)
@@ -83,10 +118,6 @@ def get_data(options, bbox):
     timeout = options['timeout']
     region = "na"
 
-    if not os.path.exists(options['output_folder']):
-        os.makedirs(options['output_folder'])
-        print('Output folder did not exist. One was created.')
-
     print('Initializing...')
     for i in range(len(bbox)):
         north = bbox[i][3]
@@ -103,7 +134,11 @@ def get_data(options, bbox):
                         str(options['start'].date()) + "T12:00:00Z&time_end=" + str(options['end'].date()) + \
                       "T12:00:00Z&timeStride=1&accept=netcdf"
                 req = urllib.request.Request(url)
-                response = urllib.request.urlopen(req, timeout=timeout)
+                try:
+                    response = urllib.request.urlopen(req, timeout=timeout)
+                except TimeoutError:
+                    print('Error: The request timed out. Consider increasing the timeout delay using the -t option')
+                    sys.exit(1)
                 totalsize = int(response.info()['Content-Length'])
                 currentsize = 0
                 old_percentage = 0
@@ -286,4 +321,3 @@ def fix_missing_values(ncfile, missing_dates, variable):
 
 if __name__ == "__main__":
     main()
-
