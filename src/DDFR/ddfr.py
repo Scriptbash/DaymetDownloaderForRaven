@@ -51,13 +51,21 @@ def check_input(args):
 
     # Check the start and end date
     try:
-        datetime.strptime(args.start, "%Y-%m-%d")
-        datetime.strptime(args.end, "%Y-%m-%d")
+        input_start_date = datetime.strptime(args.start, "%Y-%m-%d")
+        input_end_date = datetime.strptime(args.end, "%Y-%m-%d")
+        start_limit = datetime(1980, 1, 1)
+        end_limit = datetime(2023, 12, 31)
+
+        if not (start_limit <= input_start_date <= end_limit):
+            print(f"Error: Start date {args.start} is not within the allowed range (1980-01-01 to 2023-12-31).")
+            sys.exit(1)
+
+        if not (start_limit <= input_end_date <= end_limit):
+            print(f"Error: End date {args.end} is not within the allowed range (1980-01-01 to 2023-12-31).")
+            sys.exit(1)
     except ValueError:
         print('Error: Incorrect date format. Expected format is: YYYY-MM-DD.')
         sys.exit(1)
-
-    # Todo Add a check for mininum date and maximum date!!
 
     # Check for valid variables
     for variable in args.variables.split(','):
