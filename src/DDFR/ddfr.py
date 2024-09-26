@@ -23,7 +23,8 @@ def main():
     parser.add_argument("-e", "--end", type=str,
                         help="End date for the data download (format: YYYY-MM-DD).")
     parser.add_argument("-v", "--variables", type=str,
-                        help="Comma-separated list of climate variables to download (e.g., 'tmax,tmin,prcp').")
+                        help="Comma-separated list of climate variables to download "
+                             "(e.g., 'tmax,tmin,prcp,swe,srad,vp,dayl').")
     parser.add_argument("-f", "--fix_nan",
                         help="Enable this flag to fix NaN values in the dataset "
                              "by averaging neighboring cells or using prior day's data.", action="store_true")
@@ -41,7 +42,7 @@ def main():
 
 
 def check_input(args):
-    variable_options = ['tmin', 'tmax', 'prcp']
+    variable_options = ['tmin', 'tmax', 'prcp', 'swe', 'srad', 'vp', 'dayl']
 
     # Check for the watershed shapefile
     if not os.path.exists(args.input):
@@ -56,21 +57,25 @@ def check_input(args):
         print('Error: Incorrect date format. Expected format is: YYYY-MM-DD.')
         sys.exit(1)
 
+    # Todo Add a check for mininum date and maximum date!!
+
     # Check for valid variables
     for variable in args.variables.split(','):
         if variable not in variable_options:
             print('Error: The variable entered is incorrect. The available choices are :\ntmin (minimum temperature)\n'
-                  'tmax (maximum temperature)\nprcp (precipitation)')
+                  'tmax (maximum temperature)\nprcp (precipitation)\nswe (snow water equivalent)\n'
+                  'srad (solar radiation)\nvp (vapor pressure)\ndayl (day length)')
             sys.exit(1)
 
     # Check for valid output folder and if it's writable
     if not os.path.exists(args.output):
         if not os.access(args.output, os.W_OK):
-            print('Error: The output path provided is not writable.')
-            sys.exit(1)
-        else:
-            os.makedirs(args.output)
-            print('Output folder did not exist. One was created.')
+            try:
+                os.makedirs(args.output)
+                print('Output folder did not exist. One was created.')
+            except:
+                print('Error: The output path provided is not writable.')
+                sys.exit(1)
     else:
         if not os.access(args.output, os.W_OK):
             print('Error: The output path provided is not writable.')
@@ -216,7 +221,7 @@ def check_missing_dates(ncfile):
 def fix_missing_values(ncfile, missing_dates, variable):
     ds = xr.open_dataset(ncfile)
 
-    if variable == 'prcp':
+    if variable == 'prcp' or variable == 'swe':
         if missing_dates:
             # Create an empty DataArray with NaN values for the missing dates
             missing_data = xr.full_like(ds.isel(time=0), fill_value=float(0.0))
