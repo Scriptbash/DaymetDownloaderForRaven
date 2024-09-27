@@ -1,15 +1,18 @@
 # Daymet downloader for Raven
-![PyPI - Version](https://img.shields.io/pypi/v/ddfrvn)
-![GitHub License](https://img.shields.io/github/license/Scriptbash/DaymetDownloaderForRaven)
+<a href='https://pypi.org/project/ddfrvn/' target='_blank'>
+    <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/ddfrvn">
+</a>
+<a href='https://github.com/Scriptbash/DaymetDownloaderForRaven/blob/main/LICENSE' target='_blank'>
+    <img alt="GitHub License" src="https://img.shields.io/github/license/Scriptbash/DaymetDownloaderForRaven">
+</a>
 
 Download and process Daymet data for use in the Raven hydrological modelling framework.
 
-
 ## Features
- - Download Daymet data for precipitation and minimum/maximum temperature using a polygon shapefile.
- - Fix NaN values and insert missing dates
- - Merge the downloaded files
- - (Planned) Generate grid weights
+ - Download Daymet data using a polygon shapefile.
+ - Fix NaN values and insert missing dates.
+ - Merge the downloaded files.
+ - (Planned) Generate grid weights.
 
 ## Installation
 

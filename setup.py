@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ddfrvn",
-    version="0.1.0",
+    version="0.1.1",
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     install_requires=[
@@ -28,5 +28,11 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    keywords="daymet, raven, hydrology",
     python_requires='>=3.6',
+    project_urls={
+        "Bug Reports": "https://github.com/Scriptbash/DaymetDownloaderForRaven/issues",
+        "Funding": "https://ko-fi.com/scriptbash",
+        "Source": "https://github.com/Scriptbash/DaymetDownloaderForRaven",
+    },
 )
