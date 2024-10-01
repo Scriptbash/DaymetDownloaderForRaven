@@ -56,6 +56,12 @@ Download minimum temperature and precipitation with processing:
 ddfr -i '/Users/francis/Documents/watershed.shp' -s 2010-01-01 -e 2012-12-31 -v 'tmin,prcp' -f -m -o '/Users/francis/Documents/output'
 ```
 
+Example for Windows (Please use the Anaconda prompt or the console within your Python IDE)
+
+```python
+ddfr -i "C:\Users\francis\Documents\watershed.shp" -s 2000-01-01 -e 2005-12-31 -v "srad,swe" -f -m -o "C:\Users\francis\Documents\output"
+```
+
 Download maximum temperature and increase the request timeout:
 
 ```python
