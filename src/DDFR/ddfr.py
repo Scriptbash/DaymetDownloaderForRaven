@@ -7,7 +7,9 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import geopandas as gpd
+import gridweights
 from datetime import datetime, timedelta, timezone
+
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='xarray')
 
@@ -31,6 +33,7 @@ def main():
     parser.add_argument("-m", "--merge",
                         help="Merge all downloaded NetCDF files into a single output file "
                              "(per variable).", action="store_true")
+    parser.add_argument("-g", "--gridweights", help="Generate a text file containing grid weights for Raven", action="store_true")
     parser.add_argument("-o", "--output", type=str,
                         help="Path to save the processed data (output directory)")
     parser.add_argument("-t", "--timeout", type=int,
@@ -96,6 +99,7 @@ def check_input(args):
         'variables': args.variables.split(','),
         'nan_fix': args.fix_nan,
         'merge': args.merge,
+        'gridweights': args.gridweights,
         'output_folder': args.output,
         'timeout': args.timeout,
     }
@@ -175,12 +179,14 @@ def get_data(options, bbox):
                                 old_percentage = int(download_percentage)
                 print()
                 if options['nan_fix']:
-                    missing_dates = check_missing_dates(output_file)
+                    missing_dates = check_missing_dates(options['start'],options['end'], output_file)
                     fix_missing_values(output_file, missing_dates, variable)
                 else:
                     pass
             if options['merge']:
                 merge_netcdf(options['output_folder'], variable)
+        if options['gridweights']:
+            gridweights.generate_simple_weights(variable, options['polygon_shp'], options['output_folder'])
         print("Download complete!")
 
 
@@ -208,17 +214,18 @@ def merge_netcdf(file_path, variable):
         return
 
 
-def check_missing_dates(ncfile):
+def check_missing_dates(start_date, end_date, ncfile):
     ds = xr.open_dataset(ncfile)
     time_data = ds['time'].values
-    start_date = pd.Timestamp(time_data.min())
-    end_date = pd.Timestamp(time_data.max())
+
+    start_year = pd.Timestamp(time_data.min())
+    end_year = pd.Timestamp(time_data.max())
     datetime_list = [datetime.fromtimestamp(ts.astype('O') / 1e9, timezone.utc).replace(tzinfo=None)
                      for ts in time_data]
-
-    start_date = datetime(start_date.year, start_date.month, start_date.day, 12, 0)
-    end_date = datetime(end_date.year, end_date.month, end_date.day, 12, 0)
-
+    
+    start_date = datetime(start_year.year, start_date.month, start_date.day, 12, 0)
+    end_date = datetime(end_year.year, end_date.month, end_date.day, 12, 0)
+   
     all_dates = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
 
     missing_dates = [date for date in all_dates if date not in datetime_list]
