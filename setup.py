@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ddfrvn",
-    version="0.1.1",
+    version="1.0.0",
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     install_requires=[
@@ -10,6 +10,7 @@ setup(
         'xarray',
         'pandas',
         'geopandas',
+        'shapely',
     ],
     entry_points={
         'console_scripts': [

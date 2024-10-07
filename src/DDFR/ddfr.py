@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import geopandas as gpd
-import gridweights
+from DDFR.gridweights import generate_simple_weights
 from datetime import datetime, timedelta, timezone
 
 
@@ -119,16 +119,11 @@ def define_area(options):
         print('Reprojection done.')
 
     print("Extracting bounding box...")
-    bbox_list = []
+    bbox = gdf.total_bounds  # Returns (xmin, ymin, xmax, ymax)
 
-    for i, row in gdf.iterrows():
-        bbox = row.geometry.bounds  # Returns (xmin, ymin, xmax, ymax)
-        bbox = [str(round(bbox[0], 2)), str(round(bbox[1], 2)),
-                str(round(bbox[2], 2)), str(round(bbox[3], 2))]
-        bbox_list.append(bbox)
-
-    print('Bounding box extraction done.')
-    return bbox_list
+    bbox = [str(round(coord, 4)) for coord in bbox]
+    
+    return bbox
 
 
 def get_data(options, bbox):
@@ -136,58 +131,62 @@ def get_data(options, bbox):
     region = "na"
 
     print('Initializing...')
-    for i in range(len(bbox)):
-        north = bbox[i][3]
-        west = bbox[i][0]
-        east = bbox[i][2]
-        south = bbox[i][1]
+    north = bbox[3]
+    west = bbox[0]
+    east = bbox[2]
+    south = bbox[1]
 
-        for variable in options['variables']:
-            for year in range(int(options['start'].year), int(options['end'].year)+1):
-                url = "https://thredds.daac.ornl.gov/thredds/ncss/grid/ornldaac/2129/daymet_v4_daily_" + region + "_" \
-                        + variable + '_' + str(year) + ".nc?var=lat&var=lon&var=" + variable + '&north=' + north + \
-                        "&west=" + west + "&east=" + east + "&south=" + south + \
-                        "&disableProjSubset=on&horizStride=1&time_start=" + \
-                        str(options['start'].date()) + "T12:00:00Z&time_end=" + str(options['end'].date()) + \
-                      "T12:00:00Z&timeStride=1&accept=netcdf"
-                req = urllib.request.Request(url)
-                try:
-                    response = urllib.request.urlopen(req, timeout=timeout)
-                except TimeoutError:
-                    print('Error: The request timed out. Consider increasing the timeout delay using the -t option')
-                    sys.exit(1)
-                totalsize = int(response.info()['Content-Length'])
-                currentsize = 0
-                old_percentage = 0
-                chunk = 4096
+    for variable in options['variables']:
+        for year in range(int(options['start'].year), int(options['end'].year)+1):
+            url = "https://thredds.daac.ornl.gov/thredds/ncss/grid/ornldaac/2129/daymet_v4_daily_" + region + "_" \
+                    + variable + '_' + str(year) + ".nc?var=lat&var=lon&var=" + variable + '&north=' + north + \
+                    "&west=" + west + "&east=" + east + "&south=" + south + \
+                    "&disableProjSubset=on&horizStride=1&time_start=" + \
+                    str(options['start'].date()) + "T12:00:00Z&time_end=" + str(options['end'].date()) + \
+                    "T12:00:00Z&timeStride=1&accept=netcdf"
+            req = urllib.request.Request(url)
+            try:
+                response = urllib.request.urlopen(req, timeout=timeout)
+            except TimeoutError:
+                print('Error: The request timed out. Consider increasing the timeout delay using the -t option')
+                sys.exit(1)
+            totalsize = int(response.info()['Content-Length'])
+            currentsize = 0
+            old_percentage = 0
+            chunk = 4096
 
-                filename = str(year) + variable + '.nc'
-                output_file = options['output_folder'] + "/" + filename
-                print("Variable " + str(options['variables'].index(variable) + 1) + "/" +
-                      str(len(options['variables'])) + " - Downloading " + filename)
-                with open(output_file, 'wb') as file:
-                    while 1:
-                        data = response.read(chunk)
-                        if not data:
-                            break
-                        file.write(data)
-                        currentsize += chunk
-                        if totalsize > 0:
-                            download_percentage = (currentsize / totalsize) * 100
-                            if int(download_percentage) > old_percentage:
-                                print(f"\rDownload progress: {int(download_percentage)}%", end='', flush=True)
-                                old_percentage = int(download_percentage)
-                print()
-                if options['nan_fix']:
-                    missing_dates = check_missing_dates(options['start'],options['end'], output_file)
-                    fix_missing_values(output_file, missing_dates, variable)
-                else:
-                    pass
-            if options['merge']:
+            filename = str(year) + variable + '.nc'
+            output_file = options['output_folder'] + "/" + filename
+            print("Variable " + str(options['variables'].index(variable) + 1) + "/" +
+                    str(len(options['variables'])) + " - Downloading " + filename)
+            with open(output_file, 'wb') as file:
+                while 1:
+                    data = response.read(chunk)
+                    if not data:
+                        break
+                    file.write(data)
+                    currentsize += chunk
+                    if totalsize > 0:
+                        download_percentage = (currentsize / totalsize) * 100
+                        if int(download_percentage) > old_percentage:
+                            print(f"\rDownload progress: {int(download_percentage)}%", end='', flush=True)
+                            old_percentage = int(download_percentage)
+            print()
+            if options['nan_fix']:
+                missing_dates = check_missing_dates(options['start'],options['end'], output_file)
+                fix_missing_values(output_file, missing_dates, variable)
+            else:
+                pass
+        if options['merge']:
+            if int(options['end'].year) - int(options['start'].year) > 0:
                 merge_netcdf(options['output_folder'], variable)
-        if options['gridweights']:
-            gridweights.generate_simple_weights(variable, options['polygon_shp'], options['output_folder'])
-        print("Download complete!")
+            else:
+                print('Skipping merge as there is only one year.')
+    if options['gridweights'] and options['merge'] and int(options['end'].year) - int(options['start'].year) > 0:
+        generate_simple_weights(variable, options['polygon_shp'], options['output_folder'], True)
+    elif options['gridweights'] and not options['merge'] or int(options['end'].year) - int(options['start'].year) < 1:
+        generate_simple_weights(filename, options['polygon_shp'], options['output_folder'], False)
+    print("Download complete!")
 
 
 def merge_netcdf(file_path, variable):
