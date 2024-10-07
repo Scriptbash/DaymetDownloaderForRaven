@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import geopandas as gpd
-from DDFR.gridweights import generate_simple_weights
+from DDFR import generate_simple_weights
 from datetime import datetime, timedelta, timezone
 
 
