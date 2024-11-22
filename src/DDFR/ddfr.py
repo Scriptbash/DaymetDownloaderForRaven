@@ -33,9 +33,12 @@ def main():
     parser.add_argument("-m", "--merge",
                         help="Merge all downloaded NetCDF files into a single output file "
                              "(per variable).", action="store_true")
-    parser.add_argument("-g", "--gridweights", help="Generate a text file containing grid weights for Raven", action="store_true")
+    parser.add_argument("-g", "--gridweights",
+                        help="Generate a text file containing grid weights for Raven", action="store_true")
     parser.add_argument("-o", "--output", type=str,
                         help="Path to save the processed data (output directory)")
+    parser.add_argument("-c", "--convert", type=str,
+                        help="Converts the output into a csv, rvt or txt file. (e.g, 'csv', 'rvt', 'txt')")
     parser.add_argument("-t", "--timeout", type=int,
                         help="Maximum time (in seconds) to wait for network "
                              "requests before timing out. Default is 120 seconds.", default=120)
@@ -46,6 +49,7 @@ def main():
 
 def check_input(args):
     variable_options = ['tmin', 'tmax', 'prcp', 'swe', 'srad', 'vp', 'dayl']
+    conversion_options = ['csv', 'rvt', 'txt']
 
     # Check for the watershed shapefile
     if not os.path.exists(args.input):
@@ -75,8 +79,16 @@ def check_input(args):
         if variable not in variable_options:
             print('Error: The variable entered is incorrect. The available choices are :\ntmin (minimum temperature)\n'
                   'tmax (maximum temperature)\nprcp (precipitation)\nswe (snow water equivalent)\n'
-                  'srad (solar radiation)\nvp (vapor pressure)\ndayl (day length)')
+                  'srad (shortwave radiation)\nvp (vapor pressure)\ndayl (day length)')
             sys.exit(1)
+
+    # Check for valid conversion option
+    if args.convert and not args.merge:
+        print("Error: The convert option requires to enable merging of the files. Please use the '-m' option.")
+        sys.exit(1)
+    elif args.convert not in conversion_options:
+        print("Error: The conversion option is incorrect. The available options are 'csv', 'rvt' and 'txt'")
+        sys.exit(1)
 
     # Check for valid output folder and if it's writable
     if not os.path.exists(args.output):
@@ -92,6 +104,12 @@ def check_input(args):
             print('Error: The output path provided is not writable.')
             sys.exit(1)
 
+    # Ignore gridweights flag if conversion option is provided
+    if args.convert and args.gridweights:
+        print("Warning: The gridweights flag was provided, but cannot be used with the conversion option. "
+              "Ignoring the gridweights flag.")
+        args.gridweights = False
+
     options_dict = {
         'polygon_shp': args.input,
         'start': datetime.strptime(args.start, "%Y-%m-%d"),
@@ -101,6 +119,7 @@ def check_input(args):
         'merge': args.merge,
         'gridweights': args.gridweights,
         'output_folder': args.output,
+        'output_format': args.convert,
         'timeout': args.timeout,
     }
 
@@ -182,6 +201,8 @@ def get_data(options, bbox):
                 merge_netcdf(options['output_folder'], variable)
             else:
                 print('Skipping merge as there is only one year.')
+    if options['output_format']:
+        convert_output(options['output_format'], options['variables'], options['output_folder'])
     if options['gridweights'] and options['merge'] and int(options['end'].year) - int(options['start'].year) > 0:
         generate_simple_weights(variable, options['polygon_shp'], options['output_folder'], True)
     elif options['gridweights'] and not options['merge'] or int(options['end'].year) - int(options['start'].year) < 1:
@@ -336,6 +357,84 @@ def fix_missing_values(ncfile, missing_dates, variable):
     updated_data.close()
 
     ds.close()
+
+def convert_output(file_format, variables, output_path):
+    output_file = os.path.join(output_path,f"forcing.{file_format}")
+    all_averages = pd.DataFrame()
+    raven_forcing_types = {'tmin': 'TEMP_MIN',
+                           'tmax': 'TEMP_MAX',
+                           'prcp': 'PRECIP',
+                           'dayl': 'DAY_LENGTH',    # convert seconds to days
+                           'srad': 'SHORTWAVE', # need to use dayl to convert to daily
+                           'swe': 'SWE', # Unsupported as input data for Raven
+                           'vp': 'VAPOR_PRESSURE' # Unsupported as input data for Raven
+                           }
+    units_dict = {
+        'PRECIP': 'mm/d',
+        'TEMP_MIN': 'DegC',
+        'TEMP_MAX': 'DegC',
+        'DAY_LENGTH': 'd',
+        'SHORTWAVE': 'MJ/m2/d',
+        'SWE': 'kg/m2',
+        'VAPOR_PRESSURE': 'Pa'
+    }
+
+    def calculate_average():
+        spatial_dims = [dim for dim in ds.dims if dim not in ['time']]
+        return ds.mean(dim=spatial_dims)
+
+
+    for variable in variables:
+        nc_file_path = str(os.path.join(output_path, f"{variable}_merged.nc"))
+        ds = xr.open_dataset(nc_file_path)
+        average_values = calculate_average()
+        averages_df = average_values.to_dataframe().reset_index()
+        averages_df = averages_df.drop(columns=['lat', 'lon'], errors='ignore')
+        if all_averages.empty:
+            all_averages = averages_df
+        else:
+            all_averages = pd.merge(all_averages, averages_df, how='outer', on='time')
+        ds.close()
+
+    all_averages = all_averages.round(2)
+
+    # Write the dataframe to a file
+    if file_format == 'csv':
+        all_averages.to_csv(output_file, index=False)
+    elif file_format == 'txt':
+        all_averages.to_csv(output_file, sep='\t', index=False)
+    elif file_format == 'rvt':
+        # Convert W/m2 to MJ/m2/d using day length in seconds per day
+        if 'srad' in all_averages.columns and 'dayl' in all_averages.columns:
+            all_averages['srad'] = (all_averages['srad'] * all_averages['dayl']) / 1_000_000
+        elif 'srad' in all_averages.columns and 'dayl' not in all_averages.columns:
+            print('Warning: The shortwave radiation is not using the proper units for Raven.'
+                  'Current units are W/m2, but Raven expects MJ/m2/d.')
+        # Convert seconds/day to days
+        if 'dayl' in all_averages.columns:
+            all_averages['dayl'] = all_averages['dayl'] / 86400
+        for column in all_averages.columns:
+            # Rename the variable if it's in the raven_forcing_types dictionary
+            if column in raven_forcing_types:
+                if column == 'swe' or column == 'vp':
+                    print(f'Warning: the variable{column} is not supported as an input data for Raven, but it was still written to the file.')
+                all_averages.rename(columns={column: raven_forcing_types[column]}, inplace=True)
+
+        # Prepare header for the :MultiData section
+        timestamp = all_averages['time'].iloc[0]  # First timestamp
+        num_rows = len(all_averages)  # Number of observations
+        parameters = [col for col in all_averages.columns if col != 'time']
+        parameters_line = ' '.join(parameters)
+        units_line = '   '.join([units_dict.get(raven_forcing_types.get(param, param), 'Unknown') for param in parameters])
+        header = f":MultiData\n  {timestamp} 1.0 {num_rows}\n  :Parameters {parameters_line}\n  :Units {units_line}\n"
+
+        with open(output_file, 'w') as f:
+            f.write(header)
+            all_averages.drop(columns=['time'], inplace=True)
+            all_averages.to_csv(f, sep='\t', index=False, header=False)
+    else:
+        print("Error: Invalid file format option.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

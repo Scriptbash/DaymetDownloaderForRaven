@@ -2,11 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name="ddfrvn",
-    version="1.0.0",
+    version="1.1.0",
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     install_requires=[
         'numpy',
+        'dask',
         'xarray',
         'pandas',
         'geopandas',
