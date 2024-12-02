@@ -28,7 +28,7 @@ pip install ddfrvn
 ## Usage
 
 ```python
-ddfr [-h] [-i INPUT] [-s START] [-e END] [-v VARIABLES] [-f] [-m] [-g] [-o OUTPUT] [-t TIMEOUT]
+ddfr [-h] [-i INPUT] [-s START] [-e END] [-v VARIABLES] [-f] [-m] [-g] [-o OUTPUT] [-c FORMAT] [-t TIMEOUT]
 ```
 Options:
 ```
@@ -45,7 +45,7 @@ Options:
                                            file (per variable).
   -g, --gridweights                     - [optional] Generate a text file containing grid weights for Raven.
   -o OUTPUT, --output OUTPUT            -  Path to save the processed data (output directory).
-  -c FORMAT, --convert FORMAT           - [optional] Converts the output into a csv, rvt or txt file. (e.g, 'csv', 'rvt', 'txt').
+  -c FORMAT, --convert FORMAT           - [optional] Converts the output into a csv, rvt or txt file (e.g, 'csv', 'rvt', 'txt').
   -t TIMEOUT, --timeout TIMEOUT         - [optional] Maximum time (in seconds) to wait for network requests
                                            before timing out. Default is 120 seconds.
 ```

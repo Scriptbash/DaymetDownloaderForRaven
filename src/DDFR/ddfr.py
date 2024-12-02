@@ -359,6 +359,7 @@ def fix_missing_values(ncfile, missing_dates, variable):
     ds.close()
 
 def convert_output(file_format, variables, output_path):
+    # TODO Clip the ncfiles with the shapefile
     output_file = os.path.join(output_path,f"forcing.{file_format}")
     all_averages = pd.DataFrame()
     raven_forcing_types = {'tmin': 'TEMP_MIN',
