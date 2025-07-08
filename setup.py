@@ -12,6 +12,8 @@ setup(
         'pandas',
         'geopandas',
         'shapely',
+        'netCDF4',
+        'scipy',
     ],
     entry_points={
         'console_scripts': [
